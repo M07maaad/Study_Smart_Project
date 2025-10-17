@@ -10,23 +10,20 @@ app.use(cors());
 app.use(express.json());
 
 // --- Supabase Client ---
-// تأكد من أن متغيرات البيئة SUPABASE_URL و SUPABASE_ANON_KEY معرفة في Vercel
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_ANON_KEY
 );
 
 // --- Gemini AI Client ---
-// تأكد من أن متغير البيئة GEMINI_API_KEY معرف في Vercel
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // --- Static Files ---
-// هذا السطر يخبر الخادم بتقديم الملفات الموجودة في مجلد 'public'
 app.use(express.static('public'));
 
 // --- API Routes ---
 
-// Authentication
+// Authentication (No changes)
 app.post('/api/auth/signup', async (req, res) => {
     const { email, password } = req.body;
     const { data, error } = await supabase.auth.signUp({ email, password });
@@ -41,7 +38,7 @@ app.post('/api/auth/signin', async (req, res) => {
     res.json({ user: data.user, session: data.session });
 });
 
-// Content
+// Content (No changes)
 app.get('/api/courses', async (req, res) => {
     const { data, error } = await supabase.from('courses').select('*');
     if (error) return res.status(500).json({ error: error.message });
@@ -55,22 +52,23 @@ app.get('/api/materials/:courseId', async (req, res) => {
     res.json(data);
 });
 
-// --- NEW AI QUIZ ROUTE ---
+// --- UPDATED AI QUIZ ROUTE ---
 app.post('/api/generate-quiz', async (req, res) => {
     const { topic } = req.body;
-
     if (!topic) {
         return res.status(400).json({ error: 'Topic is required' });
     }
 
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+        // FIX: Using the stable model name "gemini-1.0-pro"
+        const model = genAI.getGenerativeModel({ model: "gemini-1.0-pro" });
+        
         const prompt = `
             You are a helpful assistant for university students. 
-            Based on the following topic: "${topic}", generate 5 multiple-choice questions with 4 options each to test a student's understanding.
+            Based on the following topic: "${topic}", generate exactly 5 multiple-choice questions with 4 options each to test a student's understanding.
             Provide the correct answer for each question. 
-            The output must be only a valid JSON array, without any other text or markdown formatting.
-            The JSON structure should be: 
+            The output must be only a valid JSON array, without any other text, comments, or markdown formatting like \`\`\`json.
+            The JSON structure must be: 
             [
               { 
                 "question": "The question text?", 
@@ -79,23 +77,24 @@ app.post('/api/generate-quiz', async (req, res) => {
               }
             ]
         `;
+
         const result = await model.generateContent(prompt);
         const response = await result.response;
         const text = response.text();
         
-        // Clean the response to ensure it's valid JSON
-        const cleanedText = text.replace(/```json/g, '').replace(/```/g, '').trim();
-        
-        res.json(JSON.parse(cleanedText));
+        // Attempt to parse the cleaned text
+        res.json(JSON.parse(text));
 
     } catch (error) {
-        console.error("Error generating quiz:", error);
-        res.status(500).json({ error: "Failed to generate quiz. Please try again." });
+        // Enhanced error logging
+        console.error("--- DETAILED GEMINI ERROR ---");
+        console.error(error);
+        console.error("-----------------------------");
+        res.status(500).json({ error: "Failed to generate quiz. There might be an issue with the AI service or API key." });
     }
 });
 
 // --- Serve Frontend ---
-// هذا السطر يضمن أن المستخدم سيصل دائمًا إلى واجهتك الأمامية
 app.get('*', (req, res) => {
   res.sendFile(path.resolve('public', 'index.html'));
 });
