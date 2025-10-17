@@ -52,15 +52,16 @@ app.get('/api/materials/:courseId', async (req, res) => {
     res.json(data);
 });
 
-// --- UPDATED AI QUIZ ROUTE ---
+// --- FINAL UPDATED AI QUIZ ROUTE ---
 app.post('/api/generate-quiz', async (req, res) => {
     const { topic } = req.body;
     if (!topic) {
         return res.status(400).json({ error: 'Topic is required' });
     }
 
+    let rawTextFromAI = ''; // Variable to store raw AI response for logging
+
     try {
-        // FIX: Using the stable model name "gemini-1.0-pro"
         const model = genAI.getGenerativeModel({ model: "gemini-1.0-pro" });
         
         const prompt = `
@@ -80,17 +81,29 @@ app.post('/api/generate-quiz', async (req, res) => {
 
         const result = await model.generateContent(prompt);
         const response = await result.response;
-        const text = response.text();
+        rawTextFromAI = response.text(); // Store the raw text
         
-        // Attempt to parse the cleaned text
-        res.json(JSON.parse(text));
+        // --- Robust JSON Cleaning ---
+        // Find the start and end of the JSON array
+        const startIndex = rawTextFromAI.indexOf('[');
+        const endIndex = rawTextFromAI.lastIndexOf(']');
+        
+        if (startIndex === -1 || endIndex === -1) {
+            throw new Error("AI did not return a valid JSON array.");
+        }
+        
+        const jsonString = rawTextFromAI.substring(startIndex, endIndex + 1);
+        
+        res.json(JSON.parse(jsonString));
 
     } catch (error) {
-        // Enhanced error logging
+        // --- Enhanced Error Logging ---
         console.error("--- DETAILED GEMINI ERROR ---");
-        console.error(error);
+        console.error("Error occurred:", error.message);
+        console.error("--- RAW AI RESPONSE ---");
+        console.error(rawTextFromAI); // Log the raw response that caused the error
         console.error("-----------------------------");
-        res.status(500).json({ error: "Failed to generate quiz. There might be an issue with the AI service or API key." });
+        res.status(500).json({ error: "Failed to generate quiz. Please check the server logs on Vercel for details." });
     }
 });
 
