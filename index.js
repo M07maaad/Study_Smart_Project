@@ -61,9 +61,9 @@ app.post('/api/generate-quiz', async (req, res) => {
     }
 
     try {
-        const modelName = "gemini-1.5-flash-latest";
-        // Diagnostic log to confirm which code version is running
-        console.log(`--- DIAGNOSTIC: Attempting to use Gemini model: ${modelName} ---`);
+        // Last attempt: Reverting to the most basic model name "gemini-pro"
+        const modelName = "gemini-pro";
+        console.log(`--- DIAGNOSTIC: Attempting final model: ${modelName} ---`);
 
         const model = genAI.getGenerativeModel({ model: modelName });
         
