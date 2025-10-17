@@ -2,8 +2,6 @@ import express from 'express';
 import cors from 'cors';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
-
-// استيراد path للتعامل مع مسارات الملفات
 import path from 'path';
 
 dotenv.config();
@@ -13,12 +11,7 @@ const port = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
-
-// --- الجزء السحري ---
-// هذا السطر يخبر Express بأن يعرض أي ملفات ثابتة (HTML, CSS, JS)
-// يطلبها المستخدم من داخل مجلد 'public'.
 app.use(express.static('public'));
-// --- نهاية الجزء السحري ---
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_ANON_KEY;
@@ -29,8 +22,34 @@ if (!supabaseUrl || !supabaseKey) {
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// --- نقاط الـ API ---
-// هذا الجزء يبقى كما هو، والـ API الآن موجود على مسار /api/courses
+// --- NEW AUTHENTICATION API ENDPOINTS ---
+
+// Sign Up
+app.post('/api/auth/signup', async (req, res) => {
+  const { email, password } = req.body;
+  const { data, error } = await supabase.auth.signUp({
+    email: email,
+    password: password,
+  });
+
+  if (error) return res.status(400).json({ error: error.message });
+  return res.status(201).json({ user: data.user });
+});
+
+// Sign In
+app.post('/api/auth/signin', async (req, res) => {
+  const { email, password } = req.body;
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: email,
+    password: password,
+  });
+
+  if (error) return res.status(400).json({ error: error.message });
+  return res.status(200).json({ session: data.session, user: data.user });
+});
+
+
+// --- DATA API ENDPOINTS ---
 
 app.get('/api/courses', async (req, res) => {
   try {
@@ -38,17 +57,25 @@ app.get('/api/courses', async (req, res) => {
     if (error) throw error;
     res.status(200).json(data);
   } catch (error) {
-    console.error('Error fetching courses:', error.message);
     res.status(500).json({ error: 'Failed to fetch courses' });
   }
 });
 
-// مسار احتياطي لعرض ملف index.html لأي طلب آخر
-// هذا يساعد في التطبيقات أحادية الصفحة لاحقًا.
+app.get('/api/materials/:courseId', async (req, res) => {
+  const { courseId } = req.params;
+  try {
+    const { data, error } = await supabase.from('materials').select('*').eq('course_id', courseId);
+    if (error) throw error;
+    res.status(200).json(data);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch materials' });
+  }
+});
+
+// Catch-all route to serve the frontend
 app.get('*', (req, res) => {
   res.sendFile(path.resolve('public', 'index.html'));
 });
-
 
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
