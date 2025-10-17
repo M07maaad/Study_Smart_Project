@@ -5,15 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>بوابة الطالب الذكية</title>
     
-    <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
-
-    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
 
-    <!-- CSS Styles -->
     <style>
       /* --- Global Styles & Fonts --- */
       :root {
@@ -132,7 +128,7 @@
       .material-info i { margin-left: 15px; }
       .material-actions { display: flex; align-items: center; gap: 15px; }
       .btn-quiz { background: none; border: none; cursor: pointer; color: var(--secondary-text); }
-      .btn-quiz:hover { color: var(--primary-color); }
+      .btn-quiz:hover, .btn-quiz:disabled { color: var(--primary-color); }
       /* --- Progress Bar --- */
       .progress-bar { width: 100%; background-color: #e0e0e0; border-radius: 5px; overflow: hidden; height: 8px; margin-top: 10px; }
       .progress-bar-fill { height: 100%; width: 0%; background-color: var(--success-color); transition: width 0.5s ease-out; }
@@ -146,6 +142,31 @@
       #confetti-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 9999; }
       .confetti { position: absolute; width: 10px; height: 10px; background-color: var(--primary-color); opacity: 0; }
       @keyframes confetti-fall { 0% { transform: translateY(-100vh) rotate(0deg); opacity: 1; } 100% { transform: translateY(100vh) rotate(720deg); opacity: 0; } }
+      /* --- QUIZ MODAL STYLES --- */
+      .modal-overlay {
+          position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+          background-color: rgba(0,0,0,0.6); display: flex; justify-content: center;
+          align-items: center; z-index: 1000;
+      }
+      .modal-content {
+          background-color: var(--card-bg); padding: 30px; border-radius: 12px;
+          width: 90%; max-width: 600px; text-align: center;
+          box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+      }
+      #quiz-loading { font-size: 1.2rem; font-weight: 600; }
+      #question-text { font-size: 1.5rem; margin-bottom: 20px; }
+      #options-list { display: grid; grid-template-columns: 1fr; gap: 10px; margin-bottom: 20px; }
+      #options-list li {
+          background-color: var(--background-color); border: 2px solid var(--border-color);
+          padding: 15px; border-radius: 8px; cursor: pointer;
+          transition: all 0.2s;
+      }
+      #options-list li:hover { border-color: var(--primary-color); }
+      #options-list li.selected { background-color: var(--primary-color); color: white; border-color: var(--primary-color); }
+      #options-list li.correct { background-color: #d4edda; color: #155724; border-color: #c3e6cb;}
+      #options-list li.incorrect { background-color: #f8d7da; color: #721c24; border-color: #f5c6cb;}
+      #quiz-results h3 { font-size: 2rem; color: var(--primary-color); }
+      #score-text { font-size: 1.5rem; font-weight: 700; }
       /* --- Utility Classes --- */
       .hidden { display: none !important; }
     </style>
@@ -209,12 +230,35 @@
         </div>
     </div>
     
+    <!-- QUIZ MODAL -->
+    <div id="quiz-modal" class="modal-overlay hidden">
+      <div class="modal-content">
+        <div id="quiz-loading">
+          <p>جاري توليد اختبار ذكي لك...</p>
+          <p style="font-size: 0.9rem; color: var(--secondary-text)">قد يستغرق الأمر بضع لحظات.</p>
+        </div>
+        <div id="quiz-content" class="hidden">
+          <h3 id="question-text"></h3>
+          <ul id="options-list"></ul>
+          <p id="quiz-progress"></p>
+        </div>
+        <div id="quiz-results" class="hidden">
+          <h3>اكتمل الاختبار!</h3>
+          <p>نتيجتك: <span id="score-text"></span></p>
+          <button id="close-quiz-btn" class="btn-primary" style="margin-top: 20px;">إغلاق</button>
+        </div>
+      </div>
+    </div>
+    
     <!-- JavaScript Logic -->
     <script>
         document.addEventListener('DOMContentLoaded', () => {
           // --- State ---
           let currentUser = null;
           let userProgress = new Set();
+          let currentQuiz = [];
+          let currentQuestionIndex = 0;
+          let score = 0;
           
           // --- DOM Elements ---
           const authView = document.getElementById('auth-view');
@@ -235,6 +279,17 @@
           const logoutBtn = document.getElementById('logout-btn');
           const confettiContainer = document.getElementById('confetti-container');
 
+          // --- Quiz DOM Elements ---
+          const quizModal = document.getElementById('quiz-modal');
+          const quizLoading = document.getElementById('quiz-loading');
+          const quizContent = document.getElementById('quiz-content');
+          const quizResults = document.getElementById('quiz-results');
+          const questionText = document.getElementById('question-text');
+          const optionsList = document.getElementById('options-list');
+          const scoreText = document.getElementById('score-text');
+          const closeQuizBtn = document.getElementById('close-quiz-btn');
+          const quizProgressText = document.getElementById('quiz-progress');
+
           lucide.createIcons();
 
           // --- API Functions ---
@@ -243,8 +298,24 @@
             signin: async (email, password) => (await fetch('/api/auth/signin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) })).json(),
             getCourses: async () => (await fetch('/api/courses')).json(),
             getMaterials: async (courseId) => (await fetch(`/api/materials/${courseId}`)).json(),
-            getUserProgress: async (userId) => { /* Will be implemented if needed */ },
-            markComplete: async (userId, materialId) => { /* Will be implemented if needed */ },
+            // DEBUG: Updated API call to catch errors
+            generateQuiz: async (topic) => {
+                console.log("DEBUG: Calling /api/generate-quiz with topic:", topic);
+                const response = await fetch('/api/generate-quiz', { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' }, 
+                    body: JSON.stringify({ topic }) 
+                });
+                console.log("DEBUG: Raw response from server:", response);
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error("DEBUG: Server returned an error:", errorText);
+                    throw new Error(`Server error: ${response.statusText}`);
+                }
+                const data = await response.json();
+                console.log("DEBUG: Parsed JSON data from server:", data);
+                return data;
+            },
           };
           
           // --- UI Functions ---
@@ -303,7 +374,7 @@
                     <span class="material-title">${material.title}</span>
                   </a>
                   <div class="material-actions">
-                    <button class="btn-quiz" disabled title="اختبر نفسك (قريبًا)"><i data-lucide="brain-circuit"></i></button>
+                    <button class="btn-quiz" data-topic="${material.title}" title="اختبر نفسك"><i data-lucide="brain-circuit"></i></button>
                     <div class="checkbox-container ${isCompleted ? 'checked' : ''}" data-material-id="${material.id}">
                         <i data-lucide="check"></i>
                     </div>
@@ -323,11 +394,8 @@
 
           const initializeDashboard = async () => {
             showView(dashboardView);
-            // This is a temporary solution for progress. A real app would use a database.
             userProgress = new Set(JSON.parse(localStorage.getItem(`progress_${currentUser.id}`)) || []);
-
             const courses = await api.getCourses();
-            // Fetch all materials at once to calculate progress easily
             let allMaterials = [];
             for (const course of courses) {
                 const materials = await api.getMaterials(course.id);
@@ -336,10 +404,79 @@
             renderCourses(courses, allMaterials);
           };
           
+          // --- Quiz Functions ---
+          const startQuiz = async (topic) => {
+              console.log("DEBUG: startQuiz called with topic:", topic);
+              quizModal.classList.remove('hidden');
+              quizContent.classList.add('hidden');
+              quizResults.classList.add('hidden');
+              quizLoading.classList.remove('hidden');
+              // Reset loading message
+              quizLoading.innerHTML = `<p>جاري توليد اختبار ذكي لك...</p><p style="font-size: 0.9rem; color: var(--secondary-text)">قد يستغرق الأمر بضع لحظات.</p>`;
+
+              try {
+                  const quizData = await api.generateQuiz(topic);
+                  if (quizData.error || !Array.isArray(quizData) || quizData.length === 0) {
+                      throw new Error('فشل في تحميل بيانات الاختبار.');
+                  }
+                  currentQuiz = quizData;
+                  currentQuestionIndex = 0;
+                  score = 0;
+                  
+                  quizLoading.classList.add('hidden');
+                  quizContent.classList.remove('hidden');
+                  displayQuestion();
+              } catch (error) {
+                  console.error("DEBUG: Error caught in startQuiz:", error);
+                  quizLoading.innerHTML = `<p style="color: var(--error-color)">حدث خطأ: ${error.message}</p>`;
+              }
+          };
+
+          const displayQuestion = () => {
+              const question = currentQuiz[currentQuestionIndex];
+              questionText.textContent = question.question;
+              optionsList.innerHTML = '';
+              question.options.forEach(option => {
+                  const li = document.createElement('li');
+                  li.textContent = option;
+                  li.addEventListener('click', () => selectAnswer(li, option, question.correctAnswer));
+                  optionsList.appendChild(li);
+              });
+              quizProgressText.textContent = `السؤال ${currentQuestionIndex + 1} من ${currentQuiz.length}`;
+          };
+          
+          const selectAnswer = (li, selectedOption, correctAnswer) => {
+              const options = optionsList.querySelectorAll('li');
+              options.forEach(opt => opt.style.pointerEvents = 'none');
+
+              if (selectedOption === correctAnswer) {
+                  score++;
+                  li.classList.add('correct');
+              } else {
+                  li.classList.add('incorrect');
+                   options.forEach(opt => {
+                       if(opt.textContent === correctAnswer) opt.classList.add('correct');
+                   });
+              }
+              setTimeout(() => {
+                  currentQuestionIndex++;
+                  if (currentQuestionIndex < currentQuiz.length) {
+                      displayQuestion();
+                  } else {
+                      showResults();
+                  }
+              }, 1500);
+          };
+          const showResults = () => {
+              quizContent.classList.add('hidden');
+              quizResults.classList.remove('hidden');
+              scoreText.textContent = `${score} من ${currentQuiz.length}`;
+          };
+          const closeQuiz = () => { quizModal.classList.add('hidden'); };
+          
           // --- Event Listeners ---
           showSignupLink.addEventListener('click', (e) => { e.preventDefault(); loginFormContainer.classList.add('hidden'); signupFormContainer.classList.remove('hidden'); hideError(); });
           showLoginLink.addEventListener('click', (e) => { e.preventDefault(); signupFormContainer.classList.add('hidden'); loginFormContainer.classList.remove('hidden'); hideError(); });
-          
           signupForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             hideError();
@@ -349,7 +486,6 @@
             if (result.error) { showError(result.error); } 
             else { alert('تم إنشاء حسابك بنجاح! يرجى تسجيل الدخول.'); signupForm.reset(); showLoginLink.click(); }
           });
-
           loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             hideError();
@@ -359,11 +495,13 @@
             if (result.error) { showError(result.error); } 
             else if (result.session) { currentUser = result.user; initializeDashboard(); }
           });
-
           backToCoursesBtn.addEventListener('click', () => { materialsView.classList.add('hidden'); coursesView.classList.remove('hidden'); initializeDashboard(); });
           logoutBtn.addEventListener('click', () => {
+              const userId = currentUser ? currentUser.id : null;
+              if (userId) {
+                  localStorage.removeItem(`progress_${userId}`);
+              }
               currentUser = null;
-              localStorage.removeItem(`progress_${currentUser.id}`);
               showView(authView);
               loginForm.reset(); signupForm.reset();
               materialsView.classList.add('hidden'); coursesView.classList.remove('hidden');
@@ -371,24 +509,31 @@
 
           materialsList.addEventListener('click', (e) => {
               const checkbox = e.target.closest('.checkbox-container');
-              if (!checkbox) return;
-              
-              const materialId = parseInt(checkbox.dataset.materialId);
-              const materialItem = checkbox.closest('.material-item');
+              const quizButton = e.target.closest('.btn-quiz');
 
-              if (userProgress.has(materialId)) {
-                  userProgress.delete(materialId);
-                  checkbox.classList.remove('checked');
-                  materialItem.classList.remove('completed');
-              } else {
-                  userProgress.add(materialId);
-                  checkbox.classList.add('checked');
-                  materialItem.classList.add('completed');
-                  triggerConfetti();
+              if (checkbox) {
+                  const materialId = parseInt(checkbox.dataset.materialId);
+                  const materialItem = checkbox.closest('.material-item');
+                  if (userProgress.has(materialId)) {
+                      userProgress.delete(materialId);
+                      checkbox.classList.remove('checked');
+                      materialItem.classList.remove('completed');
+                  } else {
+                      userProgress.add(materialId);
+                      checkbox.classList.add('checked');
+                      materialItem.classList.add('completed');
+                      triggerConfetti();
+                  }
+                  localStorage.setItem(`progress_${currentUser.id}`, JSON.stringify([...userProgress]));
               }
-              // Save progress to localStorage (temporary solution)
-              localStorage.setItem(`progress_${currentUser.id}`, JSON.stringify([...userProgress]));
+
+              if (quizButton) {
+                  console.log("DEBUG: Quiz button clicked!");
+                  const topic = quizButton.dataset.topic;
+                  startQuiz(topic);
+              }
           });
+          closeQuizBtn.addEventListener('click', closeQuiz);
 
           // --- Initial Check ---
           showView(authView);
