@@ -5,41 +5,82 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>بوابة الطالب الذكية</title>
   <link rel="stylesheet" href="style.css">
-  <script src="https://unpkg.com/lucide@latest" defer></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
   <script src="script.js" defer></script>
 </head>
 <body>
 
-  <div class="container">
-    <!-- View 1: Courses List (Visible by default) -->
-    <div id="courses-view">
-      <header>
-        <h1>المواد الدراسية</h1>
-        <p>اختر مادة لعرض محتوياتها.</p>
-      </header>
-      <main>
-        <ul id="courses-list">
-          <li class="loading">جاري تحميل المواد...</li>
-        </ul>
-      </main>
+  <!-- Authentication View -->
+  <div id="auth-view" class="view active">
+    <div class="auth-container">
+      <!-- Login Form -->
+      <div id="login-form-container">
+        <h2>تسجيل الدخول</h2>
+        <p>مرحباً بعودتك! سجل دخولك للوصول لموادك الدراسية.</p>
+        <form id="login-form">
+          <div class="input-group">
+            <label for="login-email">البريد الإلكتروني</label>
+            <input type="email" id="login-email" required>
+          </div>
+          <div class="input-group">
+            <label for="login-password">كلمة المرور</label>
+            <input type="password" id="login-password" required>
+          </div>
+          <button type="submit" class="btn-primary">دخول</button>
+          <p class="auth-switch">ليس لديك حساب؟ <a href="#" id="show-signup">أنشئ حسابًا جديدًا</a></p>
+        </form>
+      </div>
+      <!-- Signup Form (hidden) -->
+      <div id="signup-form-container" class="hidden">
+        <h2>حساب جديد</h2>
+        <p>انضم الآن وابدأ في تنظيم رحلتك التعليمية.</p>
+        <form id="signup-form">
+          <div class="input-group">
+            <label for="signup-email">البريد الإلكتروني</label>
+            <input type="email" id="signup-email" required>
+          </div>
+          <div class="input-group">
+            <label for="signup-password">كلمة المرور</label>
+            <input type="password" id="signup-password" required>
+          </div>
+          <button type="submit" class="btn-primary">إنشاء حساب</button>
+          <p class="auth-switch">لديك حساب بالفعل؟ <a href="#" id="show-login">سجل دخولك</a></p>
+        </form>
+      </div>
+       <div id="auth-error" class="error-message hidden"></div>
     </div>
+  </div>
 
-    <!-- View 2: Materials List (Hidden by default) -->
-    <div id="materials-view" class="hidden">
-      <header>
-        <button id="back-to-courses-btn" title="العودة للمواد">
-          <i data-lucide="arrow-right"></i>
-        </button>
-        <h1 id="course-title"></h1>
-        <p id="course-description">قائمة المحاضرات والملفات الخاصة بالمادة.</p>
-      </header>
-      <main>
-        <ul id="materials-list">
-          <!-- Materials will be loaded here by JavaScript -->
-        </ul>
-      </main>
+  <!-- Dashboard View (hidden) -->
+  <div id="dashboard-view" class="view hidden">
+    <header class="dashboard-header">
+      <h2>بوابة الطالب الذكية</h2>
+      <button id="logout-btn" class="btn-secondary">تسجيل الخروج</button>
+    </header>
+    <div class="container">
+      <!-- Courses View -->
+      <div id="courses-view">
+        <header>
+          <h1>المواد الدراسية</h1>
+          <p>اختر مادة لعرض محتوياتها.</p>
+        </header>
+        <main>
+          <ul id="courses-list"></ul>
+        </main>
+      </div>
+      <!-- Materials View (hidden) -->
+      <div id="materials-view" class="hidden">
+        <header>
+          <button id="back-to-courses-btn" title="العودة للمواد"><i data-lucide="arrow-right"></i></button>
+          <h1 id="course-title"></h1>
+        </header>
+        <main>
+          <ul id="materials-list"></ul>
+        </main>
+      </div>
     </div>
   </div>
 
 </body>
 </html>
+
