@@ -2,8 +2,9 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { createClient } from '@supabase/supabase-js';
-import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
 import 'dotenv/config';
+
+// Note: We are no longer using the @google/generative-ai library. We will use direct fetch.
 
 const app = express();
 app.use(cors());
@@ -14,12 +15,6 @@ const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_ANON_KEY
 );
-
-// --- Gemini AI Client ---
-if (!process.env.GEMINI_API_KEY) {
-    console.error("FATAL ERROR: GEMINI_API_KEY is not defined.");
-}
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // --- Static Files ---
 app.use(express.static('public'));
@@ -53,31 +48,58 @@ app.get('/api/materials/:courseId', async (req, res) => {
     res.json(data);
 });
 
-// --- FINAL WORKING AI QUIZ ROUTE ---
+// --- THE NEW, DIRECT-FETCH AI QUIZ ROUTE ---
 app.post('/api/generate-quiz', async (req, res) => {
     const { topic } = req.body;
     if (!topic) {
         return res.status(400).json({ error: 'Topic is required' });
     }
 
+    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+    if (!GEMINI_API_KEY) {
+        console.error("FATAL: GEMINI_API_KEY is not defined.");
+        return res.status(500).json({ error: "Server is not configured for AI features." });
+    }
+    
+    // Using the most basic, stable model name that should be universally available.
+    const modelName = "gemini-pro";
+    const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${GEMINI_API_KEY}`;
+
+    const prompt = `Based on the topic "${topic}", generate 5 multiple-choice questions with 4 options each. The output must be ONLY a valid JSON array of objects. Do not include any text, comments, or markdown formatting before or after the array. The JSON structure is: [{"question": "...", "options": ["A", "B", "C", "D"], "correctAnswer": "..."}]`;
+
     try {
-        // Last attempt: Reverting to the most basic model name "gemini-pro"
-        const modelName = "gemini-pro";
-        console.log(`--- DIAGNOSTIC: Attempting final model: ${modelName} ---`);
+        const payload = {
+            contents: [{
+                parts: [{ text: prompt }]
+            }]
+        };
 
-        const model = genAI.getGenerativeModel({ model: modelName });
-        
-        const prompt = `Based on the topic "${topic}", generate 5 multiple-choice questions with 4 options each. The output must be ONLY a valid JSON array of objects. Do not include any text before or after the array. The JSON structure is: [{"question": "...", "options": ["A", "B", "C", "D"], "correctAnswer": "..."}]`;
+        const apiResponse = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
 
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
+        if (!apiResponse.ok) {
+            const errorBody = await apiResponse.json();
+            console.error("--- GEMINI API ERROR RESPONSE ---", errorBody);
+            throw new Error(`Google AI API responded with status ${apiResponse.status}`);
+        }
+
+        const result = await apiResponse.json();
         
-        const rawTextFromAI = response.text();
-        
+        // Extract text from the new response structure
+        const rawTextFromAI = result.candidates[0]?.content?.parts[0]?.text;
+        if (!rawTextFromAI) {
+            console.error("--- UNEXPECTED AI RESPONSE STRUCTURE ---", result);
+            throw new Error("AI response did not contain the expected text part.");
+        }
+
         const startIndex = rawTextFromAI.indexOf('[');
         const endIndex = rawTextFromAI.lastIndexOf(']');
         
         if (startIndex === -1 || endIndex === -1) {
+            console.error("--- AI RESPONSE WITHOUT JSON ARRAY ---", rawTextFromAI);
             throw new Error("AI response did not contain a valid JSON array.");
         }
         
@@ -85,8 +107,8 @@ app.post('/api/generate-quiz', async (req, res) => {
         res.json(JSON.parse(jsonString));
 
     } catch (error) {
-        console.error("--- GEMINI ERROR ---", error);
-        res.status(500).json({ error: "Failed to generate quiz. A detailed error was logged." });
+        console.error("--- DETAILED ERROR in /generate-quiz ---", error);
+        res.status(500).json({ error: "Failed to generate quiz. A critical error was logged." });
     }
 });
 
