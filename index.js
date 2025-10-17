@@ -25,8 +25,9 @@ app.get('/api/test-key', async (req, res) => {
 
     console.log("API Key is present. Attempting to call Google AI.");
 
-    // The most stable and documented endpoint for gemini-pro.
-    const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`;
+    // --- FINAL ATTEMPT ---
+    // Using the latest, globally available model to rule out regional availability issues.
+    const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
 
     const payload = {
         contents: [{
@@ -84,3 +85,4 @@ app.get('/', (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
