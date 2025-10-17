@@ -1,0 +1,69 @@
+/* General styling for the body */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background-color: #f0f2f5;
+  color: #1c1e21;
+  margin: 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 100vh;
+  padding: 20px;
+}
+
+/* Main container */
+.container {
+  width: 100%;
+  max-width: 800px;
+  background-color: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  padding: 24px 32px;
+}
+
+header {
+  text-align: center;
+  border-bottom: 1px solid #dddfe2;
+  padding-bottom: 16px;
+  margin-bottom: 24px;
+}
+
+header h1 {
+  font-size: 2rem;
+  margin: 0;
+}
+
+header p {
+  font-size: 1rem;
+  color: #606770;
+  margin-top: 8px;
+}
+
+/* Styling for the courses list */
+#courses-list {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+}
+
+#courses-list li {
+  background-color: #f7f8fa;
+  border: 1px solid #dddfe2;
+  border-radius: 8px;
+  padding: 16px;
+  font-size: 1.1rem;
+  margin-bottom: 12px;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+#courses-list li:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* Loading and error message styles */
+.loading, .error {
+  color: #606770;
+  text-align: center;
+  font-style: italic;
+}
