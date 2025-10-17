@@ -1,145 +1,180 @@
 document.addEventListener('DOMContentLoaded', () => {
-  // --- Initialize Lucide Icons ---
-  lucide.createIcons();
 
-  // --- API Configuration ---
-  const API_BASE_URL = ''; // The base is the same domain, so it's empty
+  // --- DOM Elements ---
+  const authView = document.getElementById('auth-view');
+  const dashboardView = document.getElementById('dashboard-view');
 
-  // --- View Elements ---
+  const loginFormContainer = document.getElementById('login-form-container');
+  const signupFormContainer = document.getElementById('signup-form-container');
+  const loginForm = document.getElementById('login-form');
+  const signupForm = document.getElementById('signup-form');
+
+  const showSignupLink = document.getElementById('show-signup');
+  const showLoginLink = document.getElementById('show-login');
+  const authError = document.getElementById('auth-error');
+
   const coursesView = document.getElementById('courses-view');
   const materialsView = document.getElementById('materials-view');
-
-  // --- UI Elements ---
   const coursesList = document.getElementById('courses-list');
   const materialsList = document.getElementById('materials-list');
   const courseTitle = document.getElementById('course-title');
   const backToCoursesBtn = document.getElementById('back-to-courses-btn');
+  const logoutBtn = document.getElementById('logout-btn');
 
-  // --- Functions ---
+  // Initialize lucide icons
+  lucide.createIcons();
 
-  /**
-   * Fetches all courses from the API and displays them.
-   */
-  async function fetchCourses() {
-    coursesList.innerHTML = '<li class="loading">جاري تحميل المواد...</li>';
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/courses`);
-      if (!response.ok) throw new Error('Network response was not ok');
-      
-      const courses = await response.json();
-      renderCourses(courses);
-    } catch (error) {
-      console.error('Failed to fetch courses:', error);
-      coursesList.innerHTML = '<li class="error">حدث خطأ أثناء تحميل المواد.</li>';
+  // --- API Functions ---
+  const api = {
+    signup: async (email, password) => {
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      return await response.json();
+    },
+    signin: async (email, password) => {
+      const response = await fetch('/api/auth/signin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      return await response.json();
+    },
+    getCourses: async () => {
+        const response = await fetch('/api/courses');
+        return await response.json();
+    },
+    getMaterials: async (courseId) => {
+        const response = await fetch(`/api/materials/${courseId}`);
+        return await response.json();
     }
-  }
+  };
+  
+  // --- UI Functions ---
+  const showView = (viewToShow) => {
+    document.querySelectorAll('.view').forEach(view => view.classList.remove('active'));
+    viewToShow.classList.add('active');
+  };
 
-  /**
-   * Renders the list of courses.
-   * @param {Array} courses - An array of course objects.
-   */
-  function renderCourses(courses) {
+  const showError = (message) => {
+    authError.textContent = message;
+    authError.classList.remove('hidden');
+  };
+  
+  const hideError = () => {
+    authError.classList.add('hidden');
+  };
+
+  const renderCourses = (courses) => {
     coursesList.innerHTML = '';
-    if (courses.length === 0) {
-      coursesList.innerHTML = '<li>لم يتم إضافة أي مواد دراسية بعد.</li>';
-      return;
+    if (courses && courses.length > 0) {
+      courses.forEach(course => {
+        const li = document.createElement('li');
+        li.textContent = course.name;
+        li.dataset.courseId = course.id;
+        li.addEventListener('click', () => showMaterialsForCourse(course));
+        coursesList.appendChild(li);
+      });
+    } else {
+      coursesList.innerHTML = '<p>لم يتم إضافة أي مواد دراسية بعد.</p>';
     }
-    courses.forEach(course => {
-      const listItem = document.createElement('li');
-      listItem.textContent = course.name;
-      listItem.dataset.courseId = course.id; // Store course ID in data attribute
-      listItem.dataset.courseName = course.name; // Store course name
-      coursesList.appendChild(listItem);
-    });
-  }
+  };
 
-  /**
-   * Fetches and displays materials for a specific course.
-   * @param {string} courseId - The ID of the course.
-   * @param {string} courseName - The name of the course.
-   */
-  async function fetchMaterials(courseId, courseName) {
-    showMaterialsView(courseName);
-    materialsList.innerHTML = '<li class="loading">جاري تحميل المحتوى...</li>';
-
-    try {
-        const response = await fetch(`${API_BASE_URL}/api/materials/${courseId}`);
-        if(!response.ok) throw new Error('Network response was not ok');
-
-        const materials = await response.json();
-        renderMaterials(materials);
-    } catch (error) {
-        console.error('Failed to fetch materials:', error);
-        materialsList.innerHTML = '<li class="error">حدث خطأ أثناء تحميل المحتوى.</li>';
-    }
-  }
-
-  /**
-   * Renders the list of materials.
-   * @param {Array} materials - An array of material objects.
-   */
-  function renderMaterials(materials) {
+  const renderMaterials = (materials) => {
     materialsList.innerHTML = '';
-    if (materials.length === 0) {
-        materialsList.innerHTML = '<li>لا يوجد محتوى لهذه المادة بعد.</li>';
-        return;
+    if (materials && materials.length > 0) {
+      materials.forEach(material => {
+        const li = document.createElement('li');
+        const icon = material.type === 'lecture' ? 'file-text' : 
+                     material.type === 'section' ? 'file-input' : 'video';
+        li.innerHTML = `<i data-lucide="${icon}"></i> ${material.title}`;
+        materialsList.appendChild(li);
+      });
+    } else {
+      materialsList.innerHTML = '<p>لا يوجد محتوى لهذه المادة بعد.</p>';
     }
-    materials.forEach(material => {
-        const iconName = getIconForMaterialType(material.type);
-        const listItem = document.createElement('li');
-        listItem.innerHTML = `
-            <div class="material-icon"><i data-lucide="${iconName}"></i></div>
-            <div class="material-info">
-                <h3>${material.title}</h3>
-                <p>${material.type}</p>
-            </div>
-        `;
-        materialsList.appendChild(listItem);
-    });
-    lucide.createIcons(); // Re-render icons after adding new ones
-  }
-
-  /**
-   * Returns an icon name based on the material type.
-   * @param {string} type - The material type (e.g., 'lecture').
-   * @returns {string} The name of the Lucide icon.
-   */
-  function getIconForMaterialType(type) {
-    switch (type.toLowerCase()) {
-      case 'lecture': return 'file-text';
-      case 'section': return 'file-pie-chart';
-      case 'recording': return 'video';
-      case 'summary': return 'clipboard-list';
-      default: return 'file';
-    }
-  }
-
-  // --- View Switching Logic ---
-  function showCoursesView() {
-    materialsView.classList.add('hidden');
-    coursesView.classList.remove('hidden');
-  }
-
-  function showMaterialsView(courseName) {
-    courseTitle.textContent = courseName;
+    lucide.createIcons();
+  };
+  
+  const showMaterialsForCourse = async (course) => {
+    courseTitle.textContent = course.name;
+    const materials = await api.getMaterials(course.id);
+    renderMaterials(materials);
     coursesView.classList.add('hidden');
     materialsView.classList.remove('hidden');
-  }
+  };
 
+  const initializeDashboard = async () => {
+      showView(dashboardView);
+      const courses = await api.getCourses();
+      renderCourses(courses);
+  };
+  
   // --- Event Listeners ---
-  coursesList.addEventListener('click', (event) => {
-    if (event.target && event.target.tagName === 'LI') {
-      const courseId = event.target.dataset.courseId;
-      const courseName = event.target.dataset.courseName;
-      if (courseId) {
-        fetchMaterials(courseId, courseName);
-      }
+  showSignupLink.addEventListener('click', (e) => {
+    e.preventDefault();
+    loginFormContainer.classList.add('hidden');
+    signupFormContainer.classList.remove('hidden');
+    hideError();
+  });
+
+  showLoginLink.addEventListener('click', (e) => {
+    e.preventDefault();
+    signupFormContainer.classList.add('hidden');
+    loginFormContainer.classList.remove('hidden');
+    hideError();
+  });
+  
+  signupForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    hideError();
+    const email = document.getElementById('signup-email').value;
+    const password = document.getElementById('signup-password').value;
+    const result = await api.signup(email, password);
+    if (result.error) {
+      showError(result.error);
+    } else {
+      alert('تم إنشاء حسابك بنجاح! يرجى تسجيل الدخول.');
+      showLoginLink.click();
     }
   });
 
-  backToCoursesBtn.addEventListener('click', showCoursesView);
+  loginForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    hideError();
+    const email = document.getElementById('login-email').value;
+    const password = document.getElementById('login-password').value;
+    const result = await api.signin(email, password);
 
-  // --- Initial Load ---
-  fetchCourses();
+    if (result.error) {
+      showError(result.error);
+    } else if (result.session) {
+      // For simplicity, we are not storing the session token.
+      // In a real app, you would store result.session.access_token in localStorage.
+      initializeDashboard();
+    }
+  });
+
+  backToCoursesBtn.addEventListener('click', () => {
+    materialsView.classList.add('hidden');
+    coursesView.classList.remove('hidden');
+  });
+
+  logoutBtn.addEventListener('click', () => {
+      // In a real app, you would clear the stored session token and call supabase.auth.signOut()
+      showView(authView);
+      // Reset dashboard
+      materialsView.classList.add('hidden');
+      coursesView.classList.remove('hidden');
+  });
+
+  // --- Initial Check ---
+  // In a real app, you would check if a session token exists in localStorage
+  // and try to authenticate the user automatically.
+  // For now, we always start at the auth view.
+  showView(authView);
+
 });
 
