@@ -48,7 +48,7 @@ app.get('/api/materials/:courseId', async (req, res) => {
     res.json(data);
 });
 
-// --- THE NEW, DIRECT-FETCH AI QUIZ ROUTE ---
+// --- THE DEFINITIVE, FINAL AI QUIZ ROUTE ---
 app.post('/api/generate-quiz', async (req, res) => {
     const { topic } = req.body;
     if (!topic) {
@@ -61,8 +61,8 @@ app.post('/api/generate-quiz', async (req, res) => {
         return res.status(500).json({ error: "Server is not configured for AI features." });
     }
     
-    // Using the most basic, stable model name that should be universally available.
-    const modelName = "gemini-pro";
+    // Using the latest stable model name and API version
+    const modelName = "gemini-1.5-flash"; // More specific and stable than -latest
     const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${GEMINI_API_KEY}`;
 
     const prompt = `Based on the topic "${topic}", generate 5 multiple-choice questions with 4 options each. The output must be ONLY a valid JSON array of objects. Do not include any text, comments, or markdown formatting before or after the array. The JSON structure is: [{"question": "...", "options": ["A", "B", "C", "D"], "correctAnswer": "..."}]`;
@@ -71,7 +71,14 @@ app.post('/api/generate-quiz', async (req, res) => {
         const payload = {
             contents: [{
                 parts: [{ text: prompt }]
-            }]
+            }],
+            // Adding safety settings to prevent potential blocks
+            safetySettings: [
+                { "category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE" },
+                { "category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE" },
+                { "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE" },
+                { "category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE" }
+            ]
         };
 
         const apiResponse = await fetch(API_URL, {
@@ -88,7 +95,6 @@ app.post('/api/generate-quiz', async (req, res) => {
 
         const result = await apiResponse.json();
         
-        // Extract text from the new response structure
         const rawTextFromAI = result.candidates[0]?.content?.parts[0]?.text;
         if (!rawTextFromAI) {
             console.error("--- UNEXPECTED AI RESPONSE STRUCTURE ---", result);
