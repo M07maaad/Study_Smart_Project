@@ -3,26 +3,42 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>بوابة الطالب | المواد الدراسية</title>
-  <!-- Link to the CSS file -->
+  <title>بوابة الطالب الذكية</title>
   <link rel="stylesheet" href="style.css">
-  <!-- Defer script loading to improve performance -->
+  <script src="https://unpkg.com/lucide@latest" defer></script>
   <script src="script.js" defer></script>
 </head>
 <body>
 
   <div class="container">
-    <header>
-      <h1>المواد الدراسية</h1>
-      <p>قائمة بكل المواد المتاحة في البوابة.</p>
-    </header>
-    
-    <main>
-      <!-- This list will be filled with data from our API -->
-      <ul id="courses-list">
-        <li class="loading">جاري تحميل المواد...</li>
-      </ul>
-    </main>
+    <!-- View 1: Courses List (Visible by default) -->
+    <div id="courses-view">
+      <header>
+        <h1>المواد الدراسية</h1>
+        <p>اختر مادة لعرض محتوياتها.</p>
+      </header>
+      <main>
+        <ul id="courses-list">
+          <li class="loading">جاري تحميل المواد...</li>
+        </ul>
+      </main>
+    </div>
+
+    <!-- View 2: Materials List (Hidden by default) -->
+    <div id="materials-view" class="hidden">
+      <header>
+        <button id="back-to-courses-btn" title="العودة للمواد">
+          <i data-lucide="arrow-right"></i>
+        </button>
+        <h1 id="course-title"></h1>
+        <p id="course-description">قائمة المحاضرات والملفات الخاصة بالمادة.</p>
+      </header>
+      <main>
+        <ul id="materials-list">
+          <!-- Materials will be loaded here by JavaScript -->
+        </ul>
+      </main>
+    </div>
   </div>
 
 </body>
