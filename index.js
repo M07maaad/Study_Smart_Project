@@ -61,8 +61,8 @@ app.post('/api/generate-quiz', async (req, res) => {
     }
 
     try {
-        // THE FIX: Using the correct, stable model name "gemini-pro"
-        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+        // THE DEFINITIVE FIX: Using the newest, fastest, and most available model
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
         
         const prompt = `Based on the topic "${topic}", generate 5 multiple-choice questions with 4 options each. The output must be ONLY a valid JSON array of objects. Do not include any text before or after the array. The JSON structure is: [{"question": "...", "options": ["A", "B", "C", "D"], "correctAnswer": "..."}]`;
 
@@ -72,7 +72,8 @@ app.post('/api/generate-quiz', async (req, res) => {
         const rawTextFromAI = response.text();
         
         const startIndex = rawTextFromAI.indexOf('[');
-        const endIndex = raw-TextFromAI.lastIndexOf(']');
+        // FIX: Corrected a typo here from "raw-TextFromAI" to "rawTextFromAI"
+        const endIndex = rawTextFromAI.lastIndexOf(']');
         
         if (startIndex === -1 || endIndex === -1) {
             throw new Error("AI response did not contain a valid JSON array.");
