@@ -2,8 +2,7 @@
 document.addEventListener('DOMContentLoaded', () => {
   
   // 🚨 Replace this with your actual Vercel app URL
-  const API_BASE_URL = 'https://study-smart-project.vercel.app/'; 
-
+  const API_BASE_URL = 'https://study-smart-project.vercel.app';
   const coursesList = document.getElementById('courses-list');
 
   // Async function to fetch courses from the API
