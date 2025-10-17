@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { createClient } from '@supabase/supabase-js';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
 import 'dotenv/config';
 
 const app = express();
@@ -16,14 +16,16 @@ const supabase = createClient(
 );
 
 // --- Gemini AI Client ---
+if (!process.env.GEMINI_API_KEY) {
+    console.error("FATAL ERROR: GEMINI_API_KEY is not defined.");
+}
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // --- Static Files ---
 app.use(express.static('public'));
 
-// --- API Routes ---
+// --- API Routes (No changes to Auth or Content) ---
 
-// Authentication (No changes)
 app.post('/api/auth/signup', async (req, res) => {
     const { email, password } = req.body;
     const { data, error } = await supabase.auth.signUp({ email, password });
@@ -38,7 +40,6 @@ app.post('/api/auth/signin', async (req, res) => {
     res.json({ user: data.user, session: data.session });
 });
 
-// Content (No changes)
 app.get('/api/courses', async (req, res) => {
     const { data, error } = await supabase.from('courses').select('*');
     if (error) return res.status(500).json({ error: error.message });
@@ -52,58 +53,37 @@ app.get('/api/materials/:courseId', async (req, res) => {
     res.json(data);
 });
 
-// --- FINAL UPDATED AI QUIZ ROUTE ---
+// --- FINAL WORKING AI QUIZ ROUTE ---
 app.post('/api/generate-quiz', async (req, res) => {
     const { topic } = req.body;
     if (!topic) {
         return res.status(400).json({ error: 'Topic is required' });
     }
 
-    let rawTextFromAI = ''; // Variable to store raw AI response for logging
-
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.0-pro" });
+        // THE FIX: Using the correct, stable model name "gemini-pro"
+        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
         
-        const prompt = `
-            You are a helpful assistant for university students. 
-            Based on the following topic: "${topic}", generate exactly 5 multiple-choice questions with 4 options each to test a student's understanding.
-            Provide the correct answer for each question. 
-            The output must be only a valid JSON array, without any other text, comments, or markdown formatting like \`\`\`json.
-            The JSON structure must be: 
-            [
-              { 
-                "question": "The question text?", 
-                "options": ["Option A", "Option B", "Option C", "Option D"], 
-                "correctAnswer": "Option A" 
-              }
-            ]
-        `;
+        const prompt = `Based on the topic "${topic}", generate 5 multiple-choice questions with 4 options each. The output must be ONLY a valid JSON array of objects. Do not include any text before or after the array. The JSON structure is: [{"question": "...", "options": ["A", "B", "C", "D"], "correctAnswer": "..."}]`;
 
         const result = await model.generateContent(prompt);
         const response = await result.response;
-        rawTextFromAI = response.text(); // Store the raw text
         
-        // --- Robust JSON Cleaning ---
-        // Find the start and end of the JSON array
+        const rawTextFromAI = response.text();
+        
         const startIndex = rawTextFromAI.indexOf('[');
-        const endIndex = rawTextFromAI.lastIndexOf(']');
+        const endIndex = raw-TextFromAI.lastIndexOf(']');
         
         if (startIndex === -1 || endIndex === -1) {
-            throw new Error("AI did not return a valid JSON array.");
+            throw new Error("AI response did not contain a valid JSON array.");
         }
         
         const jsonString = rawTextFromAI.substring(startIndex, endIndex + 1);
-        
         res.json(JSON.parse(jsonString));
 
     } catch (error) {
-        // --- Enhanced Error Logging ---
-        console.error("--- DETAILED GEMINI ERROR ---");
-        console.error("Error occurred:", error.message);
-        console.error("--- RAW AI RESPONSE ---");
-        console.error(rawTextFromAI); // Log the raw response that caused the error
-        console.error("-----------------------------");
-        res.status(500).json({ error: "Failed to generate quiz. Please check the server logs on Vercel for details." });
+        console.error("--- GEMINI ERROR ---", error);
+        res.status(500).json({ error: "Failed to generate quiz. A detailed error was logged." });
     }
 });
 
